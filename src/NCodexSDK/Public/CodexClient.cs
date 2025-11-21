@@ -30,7 +30,17 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
     /// Creates a CodexClient with default infrastructure implementations.
     /// </summary>
     public CodexClient()
-        : this(Options.Create(new CodexClientOptions()), null, null, null, null, null, NullLoggerFactory.Instance.CreateLogger<CodexClient>(), NullLoggerFactory.Instance)
+        : this
+        (
+            Options.Create(new CodexClientOptions()),
+            null,
+            null,
+            null,
+            null,
+            null,
+            NullLoggerFactory.Instance.CreateLogger<CodexClient>(),
+            NullLoggerFactory.Instance
+        )
     {
     }
 
@@ -77,23 +87,45 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
     /// <summary>
     /// Creates a CodexClient with explicit client options and default infrastructure implementations.
     /// </summary>
-    public CodexClient(CodexClientOptions options)
-        : this(Options.Create(options ?? throw new ArgumentNullException(nameof(options))), null, null, null, null, null, NullLoggerFactory.Instance.CreateLogger<CodexClient>(), NullLoggerFactory.Instance)
+    public CodexClient
+    (
+        CodexClientOptions options,
+        ICodexProcessLauncher? processLauncher = null,
+        ICodexSessionLocator? sessionLocator = null,
+        IJsonlTailer? tailer = null,
+        IJsonlEventParser? parser = null,
+        ICodexPathProvider? pathProvider = null,
+        ILogger<CodexClient>? logger = null,
+        ILoggerFactory? loggerFactory = null
+    )
+        : this
+        (
+            options: Options.Create(options ?? throw new ArgumentNullException(nameof(options))),
+            processLauncher,
+            sessionLocator,
+            tailer,
+            parser,
+            pathProvider,
+            logger,
+            loggerFactory
+        )
     {
     }
 
     /// <summary>
     /// Primary constructor for dependency injection.
     /// </summary>
-    public CodexClient(
+    public CodexClient
+    (
         IOptions<CodexClientOptions> options,
-        ICodexProcessLauncher? processLauncher,
-        ICodexSessionLocator? sessionLocator,
-        IJsonlTailer? tailer,
-        IJsonlEventParser? parser,
-        ICodexPathProvider? pathProvider,
-        ILogger<CodexClient>? logger,
-        ILoggerFactory? loggerFactory)
+        ICodexProcessLauncher? processLauncher = null,
+        ICodexSessionLocator? sessionLocator = null,
+        IJsonlTailer? tailer = null,
+        IJsonlEventParser? parser = null,
+        ICodexPathProvider? pathProvider = null,
+        ILogger<CodexClient>? logger = null,
+        ILoggerFactory? loggerFactory = null
+    )
     {
         _clientOptions = (options ?? throw new ArgumentNullException(nameof(options))).Value ?? throw new ArgumentNullException(nameof(options));
 
@@ -110,9 +142,11 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
     }
 
     /// <inheritdoc />
-    public async Task<ICodexSessionHandle> StartSessionAsync(
+    public async Task<ICodexSessionHandle> StartSessionAsync
+    (
         CodexSessionOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();
@@ -129,9 +163,12 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
         Process? process = null;
         try
         {
+            var sw = Stopwatch.StartNew();
             process = await _processLauncher.StartSessionAsync(options, _clientOptions, cancellationToken).ConfigureAwait(false);
+            _logger.LogDebug("Codex process started with PID {Pid} after {ElapsedMilliseconds} ms", process.Id, sw.ElapsedMilliseconds);
+            sw.Restart();
 
-            var captureTimeout = TimeSpan.FromSeconds(Math.Min(2, _clientOptions.StartTimeout.TotalSeconds / 4));
+            var captureTimeout = TimeSpan.FromSeconds(Math.Max(10, _clientOptions.StartTimeout.TotalSeconds));
             var sessionIdCaptureTask = CaptureSessionIdAsync(process, captureTimeout, cancellationToken);
 
             // Locate the new session log file
@@ -140,59 +177,73 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
             try
             {
                 capturedId = await sessionIdCaptureTask.ConfigureAwait(false);
+                _logger.LogDebug("Captured session id {SessionId} from process output after {ElapsedMilliseconds} ms", capturedId, sw.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Failed to capture session id from process output; falling back to time-based locator.");
+                _logger.LogDebug(ex, "Failed to capture session id from process output after {ElapsedMilliseconds} ms.", sw.ElapsedMilliseconds);
+                throw;
             }
 
             if (capturedId is { } sid)
             {
                 try
                 {
-                    logPath = await _sessionLocator.WaitForSessionLogByIdAsync(
-                        sid,
-                        sessionsRoot,
-                        _clientOptions.StartTimeout,
-                        cancellationToken).ConfigureAwait(false);
+                    logPath = await _sessionLocator.WaitForSessionLogByIdAsync
+                        (
+                            sid,
+                            sessionsRoot,
+                            _clientOptions.StartTimeout,
+                            cancellationToken
+                        )
+                        .ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogDebug(ex, "Session log by id not found in time; falling back to time-based locator.");
-                    logPath = await _sessionLocator.WaitForNewSessionFileAsync(
-                        sessionsRoot,
-                        startTime,
-                        _clientOptions.StartTimeout,
-                        cancellationToken).ConfigureAwait(false);
+                    logPath = await _sessionLocator.WaitForNewSessionFileAsync
+                        (
+                            sessionsRoot,
+                            startTime,
+                            _clientOptions.StartTimeout,
+                            cancellationToken
+                        )
+                        .ConfigureAwait(false);
                 }
             }
             else
             {
-                logPath = await _sessionLocator.WaitForNewSessionFileAsync(
-                    sessionsRoot,
-                    startTime,
-                    _clientOptions.StartTimeout,
-                    cancellationToken).ConfigureAwait(false);
+                // Disable for now - produces race conditions in prod
+                // logPath = await _sessionLocator.WaitForNewSessionFileAsync(
+                //     sessionsRoot,
+                //     startTime,
+                //     _clientOptions.StartTimeout,
+                //     cancellationToken).ConfigureAwait(false);
+                throw new InvalidOperationException("Failed to capture session id from process output; cannot locate session log.");
             }
 
             // Extract session_meta
             var sessionMeta = await WaitForSessionMetaAsync(process, logPath, cancellationToken).ConfigureAwait(false);
 
-            var sessionInfo = new CodexSessionInfo(
+            var sessionInfo = new CodexSessionInfo
+            (
                 Id: sessionMeta.SessionId,
                 LogPath: logPath,
                 CreatedAt: sessionMeta.Timestamp,
                 WorkingDirectory: sessionMeta.Cwd,
-                Model: null);
+                Model: null
+            );
 
-            return new CodexSessionHandle(
+            return new CodexSessionHandle
+            (
                 sessionInfo,
                 _tailer,
                 _parser,
                 process,
                 _processLauncher,
                 _clientOptions.ProcessExitTimeout,
-                _loggerFactory.CreateLogger<CodexSessionHandle>());
+                _loggerFactory.CreateLogger<CodexSessionHandle>()
+            );
         }
         catch
         {
@@ -200,15 +251,18 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
             {
                 await SafeTerminateAsync(process, cancellationToken).ConfigureAwait(false);
             }
+
             throw;
         }
     }
 
     /// <inheritdoc />
-    public async Task<ICodexSessionHandle> ResumeSessionAsync(
+    public async Task<ICodexSessionHandle> ResumeSessionAsync
+    (
         SessionId sessionId,
         CodexSessionOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(options);
@@ -228,7 +282,8 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
         Process? process = null;
         try
         {
-            process = await _processLauncher.ResumeSessionAsync(sessionId, options, _clientOptions, cancellationToken)
+            process = await _processLauncher
+                .ResumeSessionAsync(sessionId, options, _clientOptions, cancellationToken)
                 .ConfigureAwait(false);
 
             var captureTimeout = TimeSpan.FromMilliseconds(Math.Min(250, _clientOptions.StartTimeout.TotalMilliseconds / 4));
@@ -248,21 +303,25 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
 
             var sessionMeta = await ReadSessionMetaAsync(logPath, cancellationToken).ConfigureAwait(false);
 
-            var sessionInfo = new CodexSessionInfo(
+            var sessionInfo = new CodexSessionInfo
+            (
                 Id: sessionMeta.SessionId,
                 LogPath: logPath,
                 CreatedAt: sessionMeta.Timestamp,
                 WorkingDirectory: sessionMeta.Cwd,
-                Model: null);
+                Model: null
+            );
 
-            return new CodexSessionHandle(
+            return new CodexSessionHandle
+            (
                 sessionInfo,
                 _tailer,
                 _parser,
                 process,
                 _processLauncher,
                 _clientOptions.ProcessExitTimeout,
-                _loggerFactory.CreateLogger<CodexSessionHandle>());
+                _loggerFactory.CreateLogger<CodexSessionHandle>()
+            );
         }
         catch
         {
@@ -270,14 +329,17 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
             {
                 await SafeTerminateAsync(process, cancellationToken).ConfigureAwait(false);
             }
+
             throw;
         }
     }
 
-    private async Task<SessionMetaEvent> WaitForSessionMetaAsync(
+    private async Task<SessionMetaEvent> WaitForSessionMetaAsync
+    (
         Process? process,
         string logPath,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -294,8 +356,7 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
             if (completed == exitTask)
             {
                 timeoutCts.Cancel();
-                throw new InvalidOperationException(
-                    $"Codex process exited with code {process.ExitCode} before session_meta was received.");
+                throw new InvalidOperationException($"Codex process exited with code {process.ExitCode} before session_meta was received.");
             }
         }
 
@@ -358,21 +419,25 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
 
         var meta = await ReadSessionMetaAsync(logPath, cancellationToken).ConfigureAwait(false);
 
-        var sessionInfo = new CodexSessionInfo(
+        var sessionInfo = new CodexSessionInfo
+        (
             Id: meta.SessionId,
             LogPath: logPath,
             CreatedAt: meta.Timestamp,
             WorkingDirectory: meta.Cwd,
-            Model: null);
+            Model: null
+        );
 
-        return new CodexSessionHandle(
+        return new CodexSessionHandle
+        (
             sessionInfo,
             _tailer,
             _parser,
             process: null,
             _processLauncher,
             _clientOptions.ProcessExitTimeout,
-            _loggerFactory.CreateLogger<CodexSessionHandle>());
+            _loggerFactory.CreateLogger<CodexSessionHandle>()
+        );
     }
 
     /// <summary>
@@ -461,8 +526,21 @@ public sealed class CodexClient : ICodexClient, IAsyncDisposable
 
         try
         {
-            try { process.BeginOutputReadLine(); } catch (InvalidOperationException) { /* already reading */ }
-            try { process.BeginErrorReadLine(); } catch (InvalidOperationException) { /* already reading */ }
+            try
+            {
+                process.BeginOutputReadLine();
+            }
+            catch (InvalidOperationException)
+            { /* already reading */
+            }
+
+            try
+            {
+                process.BeginErrorReadLine();
+            }
+            catch (InvalidOperationException)
+            { /* already reading */
+            }
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(timeout);

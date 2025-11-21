@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SessionMetaEvent",
+  "description": "Session initialization event - always the first event in a Codex session log",
+  "type": "object",
+  "required": ["timestamp", "type", "payload"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the event occurred"
+    },
+    "type": {
+      "type": "string",
+      "const": "session_meta",
+      "description": "Event type identifier"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique session identifier (opaque string; UUID today, but future-safe)"
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Current working directory for the session"
+        },
+        "model": {
+          "type": "string",
+          "description": "Codex model being used"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "timestamp": "2025-11-20T20:02:27.019Z",
+      "type": "session_meta",
+      "payload": {
+        "id": "019aa2a5-849a-7433-ab64-6b3f51c2fc43",
+        "cwd": "/home/user/projects/myrepo",
+        "model": "gpt-5.1-codex"
+      }
+    },
+    {
+      "timestamp": "2025-11-20T20:14:08.503Z",
+      "type": "session_meta",
+      "payload": {
+        "id": "019aa2b0-36cb-7231-96c2-ced1360c2030",
+        "cwd": "C:\\Projects\\MyApp"
+      }
+    }
+  ]
+}

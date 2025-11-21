@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TokenCountEvent",
+  "description": "Token usage statistics for a completed turn",
+  "type": "object",
+  "required": ["timestamp", "type", "payload"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "type": {
+      "type": "string",
+      "const": "token_count"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of input tokens consumed"
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of output tokens generated"
+        },
+        "reasoning_output_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of tokens used for reasoning"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "timestamp": "2025-11-20T20:02:40.456Z",
+      "type": "token_count",
+      "payload": {
+        "input_tokens": 1234,
+        "output_tokens": 567,
+        "reasoning_output_tokens": 890
+      }
+    },
+    {
+      "timestamp": "2025-11-20T20:16:25.789Z",
+      "type": "token_count",
+      "payload": {
+        "input_tokens": 2500,
+        "output_tokens": 1200
+      }
+    }
+  ]
+}

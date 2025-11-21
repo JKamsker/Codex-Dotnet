@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        framework: [net10.0]
+        dotnet: ["10.0.x"]
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+
+      - name: Restore
+        run: dotnet restore Codex.DotNet.sln
+
+      - name: Build
+        run: dotnet build Codex.DotNet.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Codex.DotNet.sln --configuration Release --no-build --framework ${{ matrix.framework }} --logger \"trx;LogFileName=test-results.trx\"

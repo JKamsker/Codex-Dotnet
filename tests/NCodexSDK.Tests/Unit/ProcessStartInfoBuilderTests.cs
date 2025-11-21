@@ -146,6 +146,58 @@ public class ProcessStartInfoBuilderTests
         }
     }
 
+    [Fact]
+    public void CreateProcessStartInfo_AllowsXHighOnlyWithGpt51CodexMax()
+    {
+        var workingDirectory = CreateTempDirectory();
+        try
+        {
+            var options = new CodexSessionOptions(workingDirectory, "prompt")
+            {
+                Model = CodexModel.Gpt51CodexMax,
+                ReasoningEffort = CodexReasoningEffort.XHigh
+            };
+            var clientOptions = new CodexClientOptions();
+            var pathProvider = new RecordingPathProvider("codex-default");
+            var launcher = new CodexProcessLauncher(pathProvider, NullLogger<CodexProcessLauncher>.Instance);
+
+            var startInfo = launcher.CreateProcessStartInfo(options, clientOptions);
+
+            startInfo.ArgumentList.Should().Contain("model_reasoning_effort=xhigh");
+            startInfo.ArgumentList.Should().Contain("gpt-5.1-codex-max");
+        }
+        finally
+        {
+            Directory.Delete(workingDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void CreateProcessStartInfo_Throws_WhenXHighUsedWithoutGpt51CodexMax()
+    {
+        var workingDirectory = CreateTempDirectory();
+        try
+        {
+            var options = new CodexSessionOptions(workingDirectory, "prompt")
+            {
+                Model = CodexModel.Gpt51Codex,
+                ReasoningEffort = CodexReasoningEffort.XHigh
+            };
+            var clientOptions = new CodexClientOptions();
+            var pathProvider = new RecordingPathProvider("codex-default");
+            var launcher = new CodexProcessLauncher(pathProvider, NullLogger<CodexProcessLauncher>.Instance);
+
+            var act = () => launcher.CreateProcessStartInfo(options, clientOptions);
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("*xhigh*only supported with model 'gpt-5.1-codex-max'*");
+        }
+        finally
+        {
+            Directory.Delete(workingDirectory, recursive: true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), $"codex-tests-{Guid.NewGuid():N}");

@@ -39,6 +39,16 @@ public class CodexReasoningEffortTests
     }
 
     [Fact]
+    public void Predefined_XHigh_HasCorrectValue()
+    {
+        // Act
+        var effort = CodexReasoningEffort.XHigh;
+
+        // Assert
+        effort.Value.Should().Be("xhigh");
+    }
+
+    [Fact]
     public void Parse_CustomValue_Works()
     {
         // Arrange
@@ -112,13 +122,13 @@ public class CodexReasoningEffortTests
     public void ImplicitConversion_ToString_Works()
     {
         // Arrange
-        var effort = CodexReasoningEffort.High;
+        var effort = CodexReasoningEffort.XHigh;
 
         // Act
         string result = effort;
 
         // Assert
-        result.Should().Be("high");
+        result.Should().Be("xhigh");
     }
 
     [Fact]
@@ -168,11 +178,15 @@ public class CodexReasoningEffortTests
         var low = CodexReasoningEffort.Low;
         var medium = CodexReasoningEffort.Medium;
         var high = CodexReasoningEffort.High;
+        var xhigh = CodexReasoningEffort.XHigh;
 
         // Assert
         low.Should().NotBe(medium);
         medium.Should().NotBe(high);
         low.Should().NotBe(high);
+        xhigh.Should().NotBe(high);
+        xhigh.Should().NotBe(medium);
+        xhigh.Should().NotBe(low);
     }
 
     [Fact]
@@ -182,5 +196,6 @@ public class CodexReasoningEffortTests
         CodexReasoningEffort.Parse("low").Should().Be(CodexReasoningEffort.Low);
         CodexReasoningEffort.Parse("medium").Should().Be(CodexReasoningEffort.Medium);
         CodexReasoningEffort.Parse("high").Should().Be(CodexReasoningEffort.High);
+        CodexReasoningEffort.Parse("xhigh").Should().Be(CodexReasoningEffort.XHigh);
     }
 }

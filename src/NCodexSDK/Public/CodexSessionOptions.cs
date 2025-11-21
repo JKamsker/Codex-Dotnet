@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using NCodexSDK.Public.Models;
 
@@ -186,6 +187,13 @@ public class CodexSessionOptions
 
         if (string.IsNullOrWhiteSpace(ReasoningEffort.Value))
             throw new InvalidOperationException("ReasoningEffort is required and cannot be empty.");
+
+        if (string.Equals(ReasoningEffort.Value, CodexReasoningEffort.XHigh.Value, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(Model.Value, CodexModel.Gpt51CodexMax.Value, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "ReasoningEffort 'xhigh' is only supported with model 'gpt-5.1-codex-max'.");
+        }
     }
 
     /// <summary>

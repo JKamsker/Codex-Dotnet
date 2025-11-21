@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,7 +9,6 @@
     <AssemblyName>NCodexSDK</AssemblyName>
     <RootNamespace>NCodexSDK</RootNamespace>
     <PackageId>NCòdexSDK</PackageId>
-    <PackageVersion>0.0.1</PackageVersion>
     <Product>NCòdexSDK</Product>
     <Title>NCòdexSDK</Title>
     

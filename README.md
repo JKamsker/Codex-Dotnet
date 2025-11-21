@@ -1,5 +1,7 @@
 # <img src="res/logo.png" align="left" width="120" height="120" /> NCodexSDK
 
+[![CI](https://github.com/JKamsker/NCodexSDK/actions/workflows/ci.yml/badge.svg)](https://github.com/JKamsker/NCodexSDK/actions/workflows/ci.yml) [![NuGet](https://img.shields.io/badge/Nuget-Download-blue?logo=nuget)](https://www.nuget.org/packages/NC%C3%B2dexSDK)
+
 <br clear="left"/>
 
 A strongly-typed .NET client library for interacting with the Codex CLI, enabling programmatic control of AI coding sessions with full event streaming and session management.
